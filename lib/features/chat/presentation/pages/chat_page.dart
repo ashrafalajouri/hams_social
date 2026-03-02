@@ -36,11 +36,34 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _marked = false;
   Timer? _typingTimer;
   late final ChatsRepository _chatsRepo;
+  late final Future<String> _readyChatIdFuture;
 
   @override
   void initState() {
     super.initState();
     _chatsRepo = ref.read(chatsRepoProvider);
+    _readyChatIdFuture = _ensureChatReady();
+  }
+
+  Future<String> _ensureChatReady() async {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) {
+      throw Exception('Not signed in');
+    }
+
+    final meSnap = await FirebaseFirestore.instance
+        .collection(FirestorePaths.users)
+        .doc(me.uid)
+        .get();
+    final username = (meSnap.data()?['username'] ?? '').toString().trim();
+    final safeUsername = username.isEmpty ? me.uid : username;
+
+    return _chatsRepo.openChat(
+      myUid: me.uid,
+      myUsername: safeUsername,
+      otherUid: widget.otherUid,
+      otherUsername: widget.otherUsername,
+    );
   }
 
   @override
@@ -97,27 +120,48 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     }
 
-    if (!_marked) {
-      _marked = true;
-      Future.microtask(() async {
-        try {
-          await _chatsRepo.markAsRead(chatId: widget.chatId, myUid: me.uid);
-        } catch (_) {
-          // Can fail with permission-denied when other side blocked this user.
+    return FutureBuilder<String>(
+      future: _readyChatIdFuture,
+      builder: (context, readySnap) {
+        if (readySnap.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
-      });
-    }
+        if (readySnap.hasError || !readySnap.hasData) {
+          final raw = readySnap.error?.toString() ?? '';
+          final msg = raw.contains('BLOCKED_USER')
+              ? 'Chat unavailable: one side blocked the other.'
+              : raw.contains('CHAT_REQUIRES_MUTUAL_FRIEND')
+              ? 'Chat requires mutual friendship.'
+              : 'Chat unavailable right now.';
+          return Scaffold(
+            appBar: AppBar(title: Text(widget.otherUsername)),
+            body: Center(child: Text(msg)),
+          );
+        }
 
-    final msgStream = _chatsRepo.watchMessages(widget.chatId);
-    final chatDocStream = FirebaseFirestore.instance
-        .collection(FirestorePaths.chats)
-        .doc(widget.chatId)
-        .snapshots();
-    final statusStream = FirebaseDatabase.instance
-        .ref('status/${widget.otherUid}')
-        .onValue;
+        final activeChatId = readySnap.data!;
 
-    return Scaffold(
+        if (!_marked) {
+          _marked = true;
+          Future.microtask(() async {
+            try {
+              await _chatsRepo.markAsRead(chatId: activeChatId, myUid: me.uid);
+            } catch (_) {}
+          });
+        }
+
+        final msgStream = _chatsRepo.watchMessages(activeChatId);
+        final chatDocStream = FirebaseFirestore.instance
+            .collection(FirestorePaths.chats)
+            .doc(activeChatId)
+            .snapshots();
+        final statusStream = FirebaseDatabase.instance
+            .ref('status/${widget.otherUid}')
+            .onValue;
+
+        return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
         title: StreamBuilder<DatabaseEvent>(
@@ -386,7 +430,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           unawaited(
                             _chatsRepo
                                 .setTyping(
-                                  chatId: widget.chatId,
+                                  chatId: activeChatId,
                                   uid: me.uid,
                                   typing: true,
                                 )
@@ -398,7 +442,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                             unawaited(
                               _chatsRepo
                                   .setTyping(
-                                    chatId: widget.chatId,
+                                    chatId: activeChatId,
                                     uid: me.uid,
                                     typing: false,
                                   )
@@ -419,13 +463,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         _c.clear();
                         _typingTimer?.cancel();
                         await _chatsRepo.setTyping(
-                          chatId: widget.chatId,
+                          chatId: activeChatId,
                           uid: me.uid,
                           typing: false,
                         );
                         try {
                           await _chatsRepo.sendMessage(
-                            chatId: widget.chatId,
+                            chatId: activeChatId,
                             myUid: me.uid,
                             otherUid: widget.otherUid,
                             text: text,
@@ -465,6 +509,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ],
         ),
       ),
+        );
+      },
     );
   }
 }
