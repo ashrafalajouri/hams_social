@@ -70,7 +70,6 @@ class ChatsRepository {
     final chatId = chatIdFor(myUid, otherUid);
     final members = _orderedMembers(myUid, otherUid);
     final chatRef = _db.collection(FirestorePaths.chats).doc(chatId);
-    final chatSnap = await chatRef.get();
 
     final myListRef = _db
         .collection(FirestorePaths.users)
@@ -85,30 +84,12 @@ class ChatsRepository {
 
     final batch = _db.batch();
 
-    final chatData = chatSnap.data();
-    final hasValidMembers =
-        chatData?['members'] is List &&
-        (chatData?['members'] as List).length == 2;
-    final memberMap = (chatData?['memberMap'] as Map?)?.cast<String, dynamic>();
-    final hasValidMemberMap =
-        memberMap != null &&
-        memberMap[myUid] == true &&
-        memberMap[otherUid] == true;
-
-    if (!chatSnap.exists || !hasValidMembers || !hasValidMemberMap) {
-      batch.set(chatRef, {
-        'members': members,
-        'memberMap': {myUid: true, otherUid: true},
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastMessage': null,
-        'lastMessageAt': null,
-        'readAtMap': {myUid: FieldValue.serverTimestamp()},
-        'typingMap': {},
-        'typingAtMap': {},
-      }, SetOptions(merge: true));
-    } else {
-      batch.update(chatRef, {'readAtMap.$myUid': FieldValue.serverTimestamp()});
-    }
+    // Avoid pre-read because non-existent chat docs fail rules.
+    // Ensure doc exists with minimal required fields; markAsRead updates readAtMap later.
+    batch.set(chatRef, {
+      'members': members,
+      'memberMap': {myUid: true, otherUid: true},
+    }, SetOptions(merge: true));
 
     batch.set(myListRef, {
       'chatId': chatId,
