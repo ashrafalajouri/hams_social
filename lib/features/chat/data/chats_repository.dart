@@ -22,29 +22,39 @@ class ChatsRepository {
     required String myUid,
     required String otherUid,
   }) async {
-    final blockedRef = _db
+    final myBlockedRef = _db
         .collection(FirestorePaths.users)
         .doc(myUid)
         .collection(FirestorePaths.blocked)
         .doc(otherUid);
-    final blockedSnap = await blockedRef.get();
-    if (blockedSnap.exists) {
+    final otherBlockedRef = _db
+        .collection(FirestorePaths.users)
+        .doc(otherUid)
+        .collection(FirestorePaths.blocked)
+        .doc(myUid);
+    final checks = await Future.wait([myBlockedRef.get(), otherBlockedRef.get()]);
+    if (checks[0].exists || checks[1].exists) {
       throw Exception('BLOCKED_USER');
     }
   }
 
-  Future<void> _ensureFriend({
+  Future<void> _ensureMutualFriend({
     required String myUid,
     required String otherUid,
   }) async {
-    final friendRef = _db
+    final myFriendRef = _db
         .collection(FirestorePaths.users)
         .doc(myUid)
         .collection(FirestorePaths.friends)
         .doc(otherUid);
-    final friendSnap = await friendRef.get();
-    if (!friendSnap.exists) {
-      throw Exception('CHAT_REQUIRES_FRIEND');
+    final otherFriendRef = _db
+        .collection(FirestorePaths.users)
+        .doc(otherUid)
+        .collection(FirestorePaths.friends)
+        .doc(myUid);
+    final checks = await Future.wait([myFriendRef.get(), otherFriendRef.get()]);
+    if (!checks[0].exists || !checks[1].exists) {
+      throw Exception('CHAT_REQUIRES_MUTUAL_FRIEND');
     }
   }
 
@@ -55,7 +65,7 @@ class ChatsRepository {
     required String otherUsername,
   }) async {
     await _ensureNotBlocked(myUid: myUid, otherUid: otherUid);
-    await _ensureFriend(myUid: myUid, otherUid: otherUid);
+    await _ensureMutualFriend(myUid: myUid, otherUid: otherUid);
 
     final chatId = chatIdFor(myUid, otherUid);
     final members = _orderedMembers(myUid, otherUid);
@@ -129,6 +139,7 @@ class ChatsRepository {
     final msg = text.trim();
     if (msg.isEmpty) return;
     await _ensureNotBlocked(myUid: myUid, otherUid: otherUid);
+    await _ensureMutualFriend(myUid: myUid, otherUid: otherUid);
 
     final chatRef = _db.collection(FirestorePaths.chats).doc(chatId);
     final msgRef = chatRef.collection(FirestorePaths.messages).doc();

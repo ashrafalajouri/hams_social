@@ -421,14 +421,19 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                                               );
                                             } catch (e) {
                                               if (!context.mounted) return;
+                                              final raw = e.toString();
+                                              final msg =
+                                                  raw.contains('BLOCKED_USER')
+                                                  ? 'Cannot open chat: one side blocked the other.'
+                                                  : raw.contains(
+                                                      'CHAT_REQUIRES_MUTUAL_FRIEND',
+                                                    )
+                                                  ? 'Cannot open chat: friendship is not mutual yet. Remove and re-add friend.'
+                                                  : 'Chat failed: $e';
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Chat failed: $e',
-                                                  ),
-                                                ),
+                                                SnackBar(content: Text(msg)),
                                               );
                                             }
                                           },

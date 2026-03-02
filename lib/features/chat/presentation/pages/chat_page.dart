@@ -432,8 +432,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           );
                         } catch (e) {
                           if (!mounted) return;
-                          final msg = e.toString().contains('BLOCKED_USER')
-                              ? 'You blocked this user. Unblock first.'
+                          final raw = e.toString();
+                          final msg = raw.contains('BLOCKED_USER')
+                              ? 'Cannot send: one side blocked the other.'
+                              : raw.contains('CHAT_REQUIRES_MUTUAL_FRIEND')
+                              ? 'Cannot send: friendship is not mutual.'
                               : 'Send failed: $e';
                           ScaffoldMessenger.of(
                             this.context,
