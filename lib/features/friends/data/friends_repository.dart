@@ -119,17 +119,11 @@ class FriendsRepository {
         .doc(myUid)
         .collection(FirestorePaths.friendRequestsIn)
         .doc(fromUid);
-    final otherOutgoingRef = _db
-        .collection(FirestorePaths.users)
-        .doc(fromUid)
-        .collection(FirestorePaths.friendRequestsOut)
-        .doc(myUid);
 
     final preChecks = await Future.wait([
       myBlockedRef.get(),
       otherBlockedRef.get(),
       myIncomingRef.get(),
-      otherOutgoingRef.get(),
       _db
           .collection(FirestorePaths.users)
           .doc(myUid)
@@ -184,8 +178,8 @@ class FriendsRepository {
     // Keep acceptance in two phases to avoid rules race conditions where
     // request docs are required for friend creation and deleted in same tx.
     final createBatch = _db.batch();
-    final myFriendExists = preChecks[4].exists;
-    final otherFriendExists = preChecks[5].exists;
+    final myFriendExists = preChecks[3].exists;
+    final otherFriendExists = preChecks[4].exists;
 
     if (!myFriendExists) {
       createBatch.set(myFriendRef, {
@@ -194,14 +188,14 @@ class FriendsRepository {
         'sinceAt': FieldValue.serverTimestamp(),
       });
     }
-    if (preChecks[3].exists && !otherFriendExists) {
+    if (!otherFriendExists) {
       createBatch.set(otherFriendRef, {
         'uid': myUid,
         'username': safeMyUsername,
         'sinceAt': FieldValue.serverTimestamp(),
       });
     }
-    if (!myFriendExists || (preChecks[3].exists && !otherFriendExists)) {
+    if (!myFriendExists || !otherFriendExists) {
       try {
         await createBatch.commit();
       } on FirebaseException catch (e) {
@@ -215,9 +209,7 @@ class FriendsRepository {
 
     final cleanupBatch = _db.batch();
     cleanupBatch.delete(inRef);
-    if (preChecks[3].exists) {
-      cleanupBatch.delete(outRef);
-    }
+    cleanupBatch.delete(outRef);
     await cleanupBatch.commit();
   }
 
