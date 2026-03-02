@@ -61,52 +61,18 @@ class ChatListPage extends StatelessWidget {
                 final doc = docs[i];
                 final d = doc.data();
 
-                final chatId = (d['chatId'] ?? doc.id) as String;
                 final otherUid = (d['otherUid'] ?? '') as String;
                 final otherUsername =
                     (d['otherUsername'] ?? 'Unknown') as String;
                 final myLastMessage = (d['lastMessage'] ?? '') as String;
                 final unread = (d['unreadCount'] ?? 0) as int;
-                final chatDocStream = FirebaseFirestore.instance
-                    .collection(FirestorePaths.chats)
-                    .doc(chatId)
-                    .snapshots();
-                final latestMsgStream = FirebaseFirestore.instance
-                    .collection(FirestorePaths.chats)
-                    .doc(chatId)
-                    .collection(FirestorePaths.messages)
-                    .orderBy('createdAt', descending: true)
-                    .limit(1)
-                    .snapshots();
+                final shownLastMessage = myLastMessage.trim();
 
-                return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                  stream: chatDocStream,
-                  builder: (context, chatSnap) {
-                    final chatData = chatSnap.data?.data() ?? const {};
-                    final chatLastMessage =
-                        (chatData['lastMessage'] as String?)?.trim() ?? '';
-                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: latestMsgStream,
-                      builder: (context, msgSnap) {
-                        String latestFromMessages = '';
-                        final msgDocs = msgSnap.data?.docs ?? const [];
-                        if (msgDocs.isNotEmpty) {
-                          latestFromMessages =
-                              (msgDocs.first.data()['text'] as String? ?? '')
-                                  .trim();
-                        }
-
-                        final shownLastMessage = latestFromMessages.isNotEmpty
-                            ? latestFromMessages
-                            : (chatLastMessage.isNotEmpty
-                                  ? chatLastMessage
-                                  : myLastMessage);
-
-                        return Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(18),
-                            onTap: () async {
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () async {
                               try {
                                 final meDoc = await FirebaseFirestore.instance
                                     .collection(FirestorePaths.users)
@@ -160,100 +126,96 @@ class ChatListPage extends StatelessWidget {
                                 ).showSnackBar(SnackBar(content: Text(msg)));
                               }
                             },
-                            child: HamsGlassCard(
-                              child: Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      final uname = Uri.encodeComponent(
-                                        otherUsername,
-                                      );
-                                      context.push('/u/$uname');
-                                    },
-                                    child: Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        gradient: HamsGradients.brand,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        otherUsername.isNotEmpty
-                                            ? otherUsername[0].toUpperCase()
-                                            : '?',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          otherUsername,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          shownLastMessage.isEmpty
-                                              ? 'Tap to chat'
-                                              : shownLastMessage,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.color
-                                                ?.withOpacity(0.85),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (unread > 0)
-                                    Container(
-                                      constraints:
-                                          const BoxConstraints(minWidth: 24),
-                                      height: 24,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                      ),
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        gradient: HamsGradients.brand,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        '$unread',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    const Icon(Icons.chevron_right_rounded),
-                                ],
+                    child: HamsGlassCard(
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              final uname = Uri.encodeComponent(
+                                otherUsername,
+                              );
+                              context.push('/u/$uname');
+                            },
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                gradient: HamsGradients.brand,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                otherUsername.isNotEmpty
+                                    ? otherUsername[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
                           ),
-                        );
-                      },
-                    );
-                  },
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  otherUsername,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  shownLastMessage.isEmpty
+                                      ? 'Tap to chat'
+                                      : shownLastMessage,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.color
+                                        ?.withOpacity(0.85),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (unread > 0)
+                            Container(
+                              constraints:
+                                  const BoxConstraints(minWidth: 24),
+                              height: 24,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                              ),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                gradient: HamsGradients.brand,
+                                borderRadius: BorderRadius.circular(
+                                  999,
+                                ),
+                              ),
+                              child: Text(
+                                '$unread',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            )
+                          else
+                            const Icon(Icons.chevron_right_rounded),
+                        ],
+                      ),
+                    ),
+                  ),
                 );
               },
             );
