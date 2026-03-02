@@ -1,0 +1,26 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "hams-social-app",
+          "appId": "1:830284923974:android:b85dd8565736e76a34f647",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "hams-social-app",
+          "configurations": {
+            "android": "1:830284923974:android:b85dd8565736e76a34f647",
+            "web": "1:830284923974:web:53896967856013d734f647",
+            "windows": "1:830284923974:web:4bb0d1aa2a42a92b34f647"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  }
+}
