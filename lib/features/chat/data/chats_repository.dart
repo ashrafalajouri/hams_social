@@ -85,7 +85,17 @@ class ChatsRepository {
 
     final batch = _db.batch();
 
-    if (!chatSnap.exists) {
+    final chatData = chatSnap.data();
+    final hasValidMembers =
+        chatData?['members'] is List &&
+        (chatData?['members'] as List).length == 2;
+    final memberMap = (chatData?['memberMap'] as Map?)?.cast<String, dynamic>();
+    final hasValidMemberMap =
+        memberMap != null &&
+        memberMap[myUid] == true &&
+        memberMap[otherUid] == true;
+
+    if (!chatSnap.exists || !hasValidMembers || !hasValidMemberMap) {
       batch.set(chatRef, {
         'members': members,
         'memberMap': {myUid: true, otherUid: true},
@@ -95,7 +105,7 @@ class ChatsRepository {
         'readAtMap': {myUid: FieldValue.serverTimestamp()},
         'typingMap': {},
         'typingAtMap': {},
-      });
+      }, SetOptions(merge: true));
     } else {
       batch.update(chatRef, {'readAtMap.$myUid': FieldValue.serverTimestamp()});
     }
