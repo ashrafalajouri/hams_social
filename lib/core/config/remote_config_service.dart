@@ -21,7 +21,8 @@ class RemoteConfigService {
       'limit_anon_C': 10,
       'limit_anon_D': 3,
       'discover_feed_limit': 25,
-      'update_version_json_url': '',
+      'update_version_json_url':
+          'https://raw.githubusercontent.com/ashrafalajouri/hams_social/main/version.json',
     });
     await rc.fetchAndActivate();
     _rc = rc;
