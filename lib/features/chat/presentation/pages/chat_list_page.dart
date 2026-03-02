@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/hams_ui.dart';
 import '../../../../firebase/firestore_paths.dart';
+import '../../data/chats_repository.dart';
 import 'chat_page.dart';
 
 class ChatListPage extends StatelessWidget {
@@ -105,17 +106,59 @@ class ChatListPage extends StatelessWidget {
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(18),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatPage(
-                                    chatId: chatId,
-                                    otherUid: otherUid,
-                                    otherUsername: otherUsername,
+                            onTap: () async {
+                              try {
+                                final meDoc = await FirebaseFirestore.instance
+                                    .collection(FirestorePaths.users)
+                                    .doc(me.uid)
+                                    .get();
+                                final myUsername =
+                                    (meDoc.data()?['username'] ?? '') as String;
+                                if (myUsername.trim().isEmpty) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Set your username first to open chat.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                final ensuredChatId = await ChatsRepository(
+                                  FirebaseFirestore.instance,
+                                ).openChat(
+                                  myUid: me.uid,
+                                  myUsername: myUsername,
+                                  otherUid: otherUid,
+                                  otherUsername: otherUsername,
+                                );
+
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatPage(
+                                      chatId: ensuredChatId,
+                                      otherUid: otherUid,
+                                      otherUsername: otherUsername,
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                final raw = e.toString();
+                                final msg =
+                                    raw.contains('CHAT_REQUIRES_MUTUAL_FRIEND')
+                                    ? 'Chat needs mutual friendship. Remove and re-add friend.'
+                                    : raw.contains('BLOCKED_USER')
+                                    ? 'Chat unavailable because one side blocked the other.'
+                                    : 'Unable to open chat: $e';
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(SnackBar(content: Text(msg)));
+                              }
                             },
                             child: HamsGlassCard(
                               child: Row(
